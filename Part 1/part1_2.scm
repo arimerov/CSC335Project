@@ -29,11 +29,38 @@
 
 ;; Part 1.2!
 
+; Most definitely should have a undirGraphify:
+; (undirGraphify G) := Given an undirGraph G, ensure G passes EVDomain?, vSet?, and eSet?
+
+(define (undirGraphify G)
+  (cond ((not (vSet? (getV G))) (undirGraphify (pair (setify (getV G)) (getE G))))
+        ((not (eSet? (getE G))) (undirGraphify (pair (getV G) (undirSetify (getE G)))))
+        ; Now that V and E are guaranteed to be sets, remove edges with reference to a v not in V,
+        ; And remove v's not specified in an Edge.
+        (else (remDisconnect G))))
+
+; (remDisconnect G) := With V and E guaranteed to be sets, remove edges with reference to a v not in V,
+        ; And remove v's not specified in an Edge.
+
+(define (remDisconnect G)
+  (remVertDis (remEdgeDis (remVertDis G))))
+
+(define (remVertDis G)
+  (cond ((null? (getV G)) (pair '() (getE G)))
+        ((vEdge? (car (getV G)) G) (V++ (car (getV G)) (remVertDis (V-- G))))
+        (else (remVertDis (V-- G)))))
+
+(define (remEdgeDis G)
+  (cond ((null? (getE G)) (pair (getV G) '()))
+        ((and (inSet? (first (car (getE G))) (getV G)) (inSet? (second (car (getE G))) (getV G)))
+         (E++ (car (getE G)) (remEdgeDis (E-- G))))
+        (else (remEdgeDis (E-- G)))))
+
 ;; Suggestions of possible computations:
 ;;;; path?(v1, v2) -> BOOL
-;;;; shortPath(v1, v2) -> INT
+;;;; shortPath(v1, v2) -> [INT or LIST DETAILING SHORTEST ROUTE aka breFirst]
 ;;;; acyclic?(G) -> BOOL
-;;;; connected?(G) -> BOOL
+;;;; connected?(G) -> BOOL [tech EVDomain?]
 ;;;; spanningTree(G) -> TREE (requires defining TREE)
 ;;;; diameter(G) -> INT
 ;;;; bipartite?(G) -> BOOL
@@ -51,7 +78,9 @@
 
 ;;; CLIQUE: Subset of vertices of an undirected graph s.t. (for all) v1, v2 (in) C (subset) V -> v1 (adjacent) v2
 
+;; (tree? G) -> (and (connected? G) (acyclic? G) (undir? G))
 
+;; (connected? G) <=> (EVDomain? (getE G) (getV G))
 
 
 
@@ -110,7 +139,7 @@
   (pair (cdr (getV G)) (getE G)))
 (define (E-- G)
   (pair (getV G) (cdr (getE G))))
-(define (VE-- G)
+(define (VE-- G) ;Equivalent to (V-- (E-- G))
   (pair (cdr (getV G)) (cdr (getE G))))
 
 (define (V++ v G)
@@ -157,6 +186,9 @@
 ; Thus, consequential for definition of data type 'path'.
 
 ; DFS requires goes down a branch as far as possible before backtracking.
+; RULES: As we traverse down an edge, the edge is removed from set E in G.
+;;; As we leave a vertex, the vertex is removed from set V in G.
+
 
 ; pre: G is an Undirected Graph
 
@@ -167,13 +199,116 @@
           ((not (and (inSet? vStart V) (inSet? vTar V))) '(())) ;If either inputted vertex doesn't exist in V, then there's no solution.
           ((vEdge? vStart G) (let ((G1 (remEdge (getEdge vStart G) G)))
                                    (cond ((equal? vTar (getEdgeAdj vStart G)) (pair vStart vTar))
-                                         ((inSet? (getEdgeAdj vStart G) V)
-                                          (let ((B1 (depFirst (getEdgeAdj vStart G) vTar (remVert vStart G1))))
-                                            (if (lat? B1) (cons vStart B1) (depFirst vStart vTar G1))))
-                                         (else (depFirst vStart vTar G1)))))
-          (else '()))))
-; ^Imma be honest, I winged this one. I can't believe it actually worked. Probably has a bug tho no cap.
+                                         ((inSet? (getEdgeAdj vStart G) V) ; If this is false, then the graph is cyclic!
+                                          (let ((D1 (depFirst (getEdgeAdj vStart G) vTar (remVert vStart G1)))) ; D1 prioritizes traversing the edge first
+                                            (if (lat? D1) (cons vStart D1) (depFirst vStart vTar G1)))) ; If traversing the edge does not yield a correct answer, then it calls itself with the same vertex and the edge removed.
+                                         (else (depFirst vStart vTar G1))))) ; Else ensure the code doesn't traverse a loop during search.
+          (else '(())))))
 
+; Breadth-First should be similar, but instead calls (depFirst vStart vTar G1) since looking at all connections if first priority.
+
+(define (breFirst vStart vTar G)
+  (let ((V (getV G)) (E (getE G)))
+    (cond ((null? V) '(())) ;If V is null, then all vertices have been searched
+          ((null? E) '(())) ;If E is null, then all edges have been searched
+          ((not (and (inSet? vStart V) (inSet? vTar V))) '(())) ;If either inputted vertex doesn't exist in V, then there's no solution.
+          ((vEdge? vStart G) (let ((G1 (remEdge (getEdge vStart G) G)))
+                                   (cond ((equal? vTar (getEdgeAdj vStart G)) (pair vStart vTar))
+                                         ((inSet? (getEdgeAdj vStart G) V)
+                                          (let ((B1 (breFirst vStart vTar G1)))
+                                            (if (lat? B1) B1 (cons vStart (breFirst (getEdgeAdj vStart G) vTar (remVert vStart G1))))))
+                                         (else (cons vStart (breFirst (getEdgeAdj vStart G) vTar (remVert vStart G1)))))))
+          (else '(())))))
+
+; Now having Depth-First and Breadth-First, we can easily define path and acyclic.
+
+
+;(define (acyclic? G)
+;  (cond ((null? (getV G)) #t)
+;        ((null? (getE G)) #t)
+        ; If (vEdge? (car (getV G))) returns #f, then there's nowhere to go, and at the end of the graph with no loops found:
+;        ((not (vEdge? (car (getV G)) G)) #t)
+        ; If (getEdgeAdj (car (getV G)) G) is in Set V, then call this function with both vertex and edge removed.
+;        ((inSet? (getEdgeAdj (car (getV G)) G) (getV G)) (and (acyclic? (remEdge (getEdge (car (getV G)) G) G)) (acyclic? (V-- (remEdge (getEdge (car (getV G)) G) G)))))
+        ; ^ Must check for cycles down the first edge found, and any other possible edges containing (car (getV G)).
+        ; If (getEdgeAdj (car (getV G)) G) is not in Set V, then there must be a cycle:
+;        (else #f)))
+
+; After some testing, it was found that the initial code improperly returns #f since (acyclic? (V-- (remEdge (getEdge (car (getV G)) G) G))) doesn't remove all occurrences of v in edges.
+;; The code gets confused since the other edge that can possibly be traversed, yet not directly connected to the branch looked at currently contains the vertex just removed, and hence returns #f.
+;; Thus, there needs to be a check to see if there's a connection between the two branches. If there is, then there's a cycle!
+
+; Procedure for acyclic? should be be as follows:
+; 1) Is V null? -> #t
+; 2) Is E null? -> #t
+; 3) If v has no branches -> #t
+; 4) If v has 1 branch -> remove v and respective e from G, and see if that graph is acyclic
+; 5) 2? -> Is there a connected between the two branches? (Yes -> #f; No -> #t)
+; 6) 3, 4, 5? -> (exists) connection b/w any of the brancheds -> #f; Else -> #t
+; Thus, 5 and 6 are 'else' where (and (not (connected? G G1)) (acyclic? (remEdge (getEdge (car (getV G)))))
+;; ^ where G is current 'first' edge, and G1 is graph with 'first' edge removed and thus checking second edge.
+;; ^^ Guaranteed second edge because case 3 was found false.
+
+; Else: return: (not (connected? Branch 1 and Branch2)) AND (acyclic? (G with edge removed)) <- To cover 3 or more edges
+; ^ Where B1 == G following first found edge and with prior vertex, traversed edge, and all disconnected edges removed.
+; --------B2 == G following second found edge and with prior vertex, traversed edge, and all disconnected edges removed.
+; ^^ 
+
+(define (acyclic? G)
+  (let ((v (car (getV G))))
+    (cond ((null? (getV G)) #t)
+          ((null? (getE G)) #t)
+          ; If (vEdge? (car (getV G))) returns #f, then there's nowhere to go, and at the end of the graph with no loops found:
+          ((not (vEdge? v G)) #t)
+          ((oneEdge? v G) (acyclic? (V-- (remEdge (getEdge v G) G))))
+          (else (let ((B1 (undirGraphify (V-- (remEdge (getEdge v G) G)))) (B2 (undirGraphify (V-- (remEdge (nextEdge v G) G)))))
+                  (and (not (connection? B1 B2)) (acyclic? (remEdge (getEdge v G) G))))))))
+; ^need to fill in B1 and B2 at some point.
+
+; Make helper:
+; (moreEdge? v G) := #t if more than 1 edge in G containing v; #f if only 1 or none.
+(define (moreEdge? v G)
+  (cond ((not (inSet? v (getV G))) #f) ; Not in graph, so can't have an edge
+        ((not (vEdge? v G)) #f) ; Doesn't have an edge, so #f for 0
+        ((vEdge? v (remEdge (getEdge v G) G)) #t)
+        (else #f)))
+
+; (oneEdge? v G) := #t if only 1 edge in G containing v; #f is 0 or more than 1 edge with v.
+(define (oneEdge? v G)
+  (cond ((not (inSet? v (getV G))) #f) ; Not in graph, so can't have an edge
+        ((not (vEdge? v G)) #f) ; Doesn't have an edge, so #f for 0
+        ((moreEdge? v G) #f)
+        (else #t)))
+
+(define (nextEdge v G)
+  (getEdge v (remEdge (getEdge v G) G)))
+
+; (connection? G1 G2) := G1 and G2 have a connection if they have an edge connecting from a vertex from G1 to a vertex in G2.
+; if: (exists) v s.t. v (in) G1 and v (in) G2, then #t if (and (vEdge? v G1) (vEdge? v G2))
+; if: no shared v, then there's no way to be connected unless I messed up. Can check for mess up if (EVDomain? G) => #f
+; Just inserted (connected? G1) AND (connected? G2) to check for mess-up incase the tree itself is not connected.
+
+(define (vShare? G1 G2)
+  (cond ((null? (getV G1)) #f)
+        ((inSet? (car (getV G1)) (getV G2)) #t)
+        (else (or #f (vShare? (V-- G1) G2)))))
+
+(define (getVShare G1 G2)
+  (cond ((null? (getV G1)) #f)
+        ((inSet? (car (getV G1)) (getV G2)) (car (getV G1)))
+        (else (getVShare (V-- G1) G2))))
+
+(define (connection? G1 G2)
+  (cond ((VShare? G1 G2) (let ((v (getVShare G1 G2))) (and (vEdge? v G1) (vEdge? v G2) (connected? G1) (connected? G2))))
+        (else #f)))
+
+; Thus, a singular tree is connected if all the listed vertices appear in at least a specified edge
+(define (connected? G)
+  (cond ((null? (getV G)) #t)
+        ((vEdge? (car (getV G)) G) (and #t (connected? (V-- G))))
+        (else #f)))
+
+; Should I make a function that takes a disconnected graph and returns a set of vertices which are disconnected?
 
 
 ;;(let (
@@ -186,7 +321,7 @@
 
 ; Using '(()) for termination resulting in #f because the proper result should be a lat, allowing lat? to test if result is true.
 
-;; (vEdge? v G) := #t if (exists) edge in G containing v in the pair.
+;; (vEdge? v G) := #t if (exists) edge in G containing v in the pair. (look at a vertice in a graph. do you see an edge?)
 (define (vEdge? v G)
   (cond ((null? (getE G)) #f)
         ((equal? v (first (car (getE G)))) #t)

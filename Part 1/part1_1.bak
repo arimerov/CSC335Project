@@ -177,9 +177,6 @@
 (define (undirGraph? G)
   (and (VSet? (getV G)) (ESet? (getE G)) (undirSet? (getE G)) (EVDomain? (getE G) (getV G))))
 
-;; Assume G is a graph. Must undirSetify E, Setify V, if(not(EVdomain?)) remove edges with missing v. (Check 1.2)
-
-
 
 ; Documentation so far:
 
@@ -207,7 +204,6 @@
 ;; (revPair p) := Takes in pair p := (A B) and return (B A).
 ;; (undirSetify S) := Removes duplicates in lat where (A B) and (B A) are considered duplicates.
 ;; (undirGraph? G) := #t if G is an undirected graph.
-;; (undirGraphify G) := Make G into an undirected graph if not so already.
 
 
 ; Next Steps:
