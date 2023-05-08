@@ -192,20 +192,22 @@
   (or (inSet? (pair v1 v2) (getE G)) (inSet? (pair v2 v1) (getE G))))
 
 ; Documentation so far:
-;; (acyclic? G) := #t if is G is accrylic; #f if G has a cycle
-;; (connected? G) := returns #t if G is a connected graph; #f if G is disconnected
-;; (path? vStart VTar G) := #t if path exists vStart -> vTar; #f otherwise
-;; (depFirst vStart vTar G) := Returns the path found (if any) by doing dfs ; if no path then returns '(())
-;; (breFirst vStart vTar G) := Returns the path found (if any) by doing bfs ; if no path then returns '(())
+
 ;; (vEdge? v G) := #t if (exists) edge in G containing v in the pair. (look at a vertice in a graph. do you see an edge?)
 ;; (getEdge v G) := Returns first found edge pair containing v.
 ;; (getEdgeInd v G) := Returns index of first found edge pair containing v.
 ;; (getEdgeAdj v G) := Returns adjacent vertex in first found edge containing v.
 ;; (remVert v G) := Removes v from G
 ;; (remEdge e G) := Removes e from G
+
+;; (path? vStart VTar G) := #t if path exists vStart -> vTar; #f otherwise
+;; (depFirst vStart vTar G) := Returns the path found (if any) by doing dfs ; if no path then returns '(())
+;; (breFirst vStart vTar G) := Returns the path found (if any) by doing bfs ; if no path then returns '(())
+
 ;; (tree? G) := Returns #t if G is a tree; #f otherwise
 ;; (adjacent? v1 v2 G) := Returns #t if 2 verticies are adjacent (i.e. there exists an edge connecting v1 and v2 in G), #f otherwise
-
+;; (acyclic? G) := #t if is G is accrylic; #f if G has a cycle
+;; (connected? G) := returns #t if G is a connected graph; #f if G is disconnected
 
 ;--------------------------------------------------------------------------------------------------------------------------
 
@@ -499,6 +501,7 @@
         (else (cons (car L) (popIter (- n 1) (cdr L))))))
 (define (remIter n L)
   (cond ((zero? n) L)
+        ((null? L) L)
         (else (popIter (- n 1) (cdr L)))))
 
 
@@ -561,8 +564,50 @@
 
 
 
+; Documentation So Far:
+
+; (bipartite? G) := #t if G is bipartite, or #f if G is bipartite.
+;
+
+; (getAllEdgeAdj v G) := Returns all vertices connected to v assumming 
+
+; (union S1 S2) := appends elements of S1 into S2.
+; (moreEdge? v G) := #t if vertex v has more than 1 undirect edge connected to it. #f if only 1 or none.
+; (oneEdge? v G) := #t if vertex v has only 1 undirect edge.
+; (nextEdge v G) := Returns the second undirect edge connected to v.
+; (disjoint? S1 S2) := Returns #t if S1 and S2 are disjoint sets. #f otherwise.
+
+; (consEnd a list) := Appends element a to the end of list.
+; (altUnion L1 L2) := alternates unioning elements into 1 set.
+
+; (treeify G v) := Given v as the root, return G s.t. G is a tree with v as the root.
+
+; (firsts E) := Return set of vertices in G with dirEdges directing away from them.
+; (seconds E) := Return set of vertices in G with dirEdges directing towards them.
+; (findHeads G) := Returns set of vertices in G with no edges directing towards them. aka set of 'head' vertices in G.
+; (findTails G) := Returns set of vertices in G with only edges directing towards them. aka set of 'tail' vertices in G.
+
+; (remEdges E G) := Removes all Edges detailed in set E from graph G.
+; (remVerts V G) := Removes all Vertices detailed in set V from graph G.
+; (remEdgesFromV V G) := Input set of vertices V, and removes all edges directed away from each v (in) V.
+; (getAssoEdges V G) := Input set of vertices V, and returs a set of all edges directing away from each v (in) V.
+
+; (forvInSUn S G funct Un) := for all v listed in set S, perform (funct v G), and union the results using the 'Un' procedure.
+; (topSort G) := Finds the topographic vertex sorting of graph G.
+; (topSortIter v G) := Certain same as (treeify G v); Returns topographic from root v.
+; (cdrUntilMatch v L2) := Removes first elements from L2 until the first element in L2 is the same as v.
+; (findVCommon L1 L2) := Returns first v that are in both L1 and L2.
+; (commonLabelIndexDiff v L1 L2) := Returns integer detailing how many more elements are before common v in L1 compared to L2.
+
+; (popIter n L) := Returns lat of n first elements in lat L.
+; (remIter n L) := Removes n elements from beginning of lat L.
+; (altUnionCom L1 L2) := This performs an alternating union around the first common vertex in both L1 and L2. This preserves topography.
+; (getIndex v S) := Returns index value of v in S for reference later.
 
 
+
+
+; (
 
 ; ---------------------------------------------------------------------------------------------------------------------
 
@@ -571,7 +616,29 @@
 
 ;;;; ANSWER: Instead of (V E) -> G, (V E W) -> WG, where W is a lat directly correlating to repective edges' weight.
 
+; WG ::= (V E W)
+;; where W is constrained as follows:
+;;;; a) elements are nonnegative numbers
+;;;; b) Support up to Q (rational numbers) [a/b | a, b (in) Z]
+;;;; c) W(i) (mapsto) E(i)
 
+(define (getW G)
+  (car (cdr (cdr G))))
+(define (W-- G)
+  (triple (getV G) (getE G) (cdr (getW G))))
+(define (W++ w G)
+  (triple (getV G) (getE G) (car w (getW G))))
+(define (triple V E W)
+  (cons V (cons E (cons W '()))))
+
+(define (weMatch? G)
+  ; number of elements in E == number of elements in W.
+  (cond ((null? (getE G)) (null? (getW G)))
+        ((null? (getW G)) (null? (getE G)))
+        (else (weMatch? (E-- (W-- G))))))
+
+; (getAssoWeight v G) := For vertex v, get the weight of the first dirEdge directing away from v.
+; (getLowestAssoWeight := For vertex v, get the weight of the dirEdge directing away from v with the lowest weight. [MUST BE NONNEGATIVE]
 
 
 
@@ -899,6 +966,13 @@
 ;; (getEdgeAdj v G) := Returns adjacent vertex in first found edge containing v.
 ;; (remVert v G) := Removes v from G
 ;; (remEdge e G) := Removes e from G
+
+;; (vShare? G1 G2) := #t if G1 and G2 share a vertex.
+;; (getVShare G1 G2) := Returns first v in G1 and G2 that is shared.
+
+
+;; (undirGraphify G) := Given an undirGraph G, ensure G passes EVDomain?, vSet?, and eSet?
+;; (remDisconnect G) := With V and E guaranteed to be sets, remove edges with reference to a v not in V, and remove v's not specified in an Edge.
 
 
  
