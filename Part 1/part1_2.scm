@@ -100,12 +100,12 @@
 
 ;; (remVert v G) := Removes v from G
 (define (remVert v G)
-  (cond ((null? (getV G)) '())
+  (cond ((null? (getV G)) G)
         ((equal? v (car (getV G))) (V-- G))
         (else (V++ (car (getV G)) (remVert v (V-- G))))))
 ;; (remEdge e G) := Removes e from G
 (define (remEdge e G)
-  (cond ((null? (getE G)) '())
+  (cond ((null? (getE G)) G)
         ((equal? e (car (getE G))) (E-- G))
         (else (E++ (car (getE G)) (remEdge e (E-- G))))))
 
@@ -131,6 +131,26 @@
         ((oneEdge? (car (getV G)) G) (and #t (acyclic? (V-- (remEdge (getEdge (car (getV G)) G) G)))))
         (else (and (not (path? (getEdgeAdj (car (getV G)) G) (car (getV G)) (remEdge (getEdge (car (getV G)) G) G)))
                    (acyclic? (remEdge (getEdge (car (getV G)) G) G))))))
+
+
+; (acyclify G) := Takes in G and removes edges s.t. G is acyclic.
+; pre: G is an undirected graph
+(define (acyclify G)
+  (cond ((null? (getV G)) G)
+        ((null? (getE G)) G)
+        ((not (vEdge? (car (getV G)) G)) (V++ (car (getV G)) (acyclify (V-- G))))
+        ((oneEdge? (car (getV G)) G) (V++ (car (getV G)) (E++ (getEdge (car (getV G)) G) (acyclify (V-- (remEdge (getEdge (car (getV G)) G) G))))))
+        ((path? (getEdgeAdj (car (getV G)) G) (car (getV G)) (remEdge (getEdge (car (getV G)) G) G)) ;Path between current node and edgeAdj
+         (remEdge (getEdge (car (getV G)) G) (acyclify (remEdge (getEdge (car (getV G)) G) G))))
+        (else (acyclify (remEdge (getEdge (car (getV G)) G) G)))))
+
+; (graphUnion G1 G2) <= Takes data from two undirected graphs with same labeling and merges them into one, ensuring sets of both V and E too!
+(define (graphUnion G1 G2)
+  (pair (setify (union (getV G1) (getV G2))) (undirSetify (union (getE G1) (getE G2)))))
+
+(define (dirGraphUnion G1 G2)
+  (pair (setify (union (getV G1) (getV G2))) (setify (union (getE G1) (getE G2)))))
+                      
 
 ; connected?(G) := returns #t if G is a connected graph; #f if G is disconnected
 ; my idea: iterate through set V (aka check every vertex).
@@ -285,6 +305,289 @@
 
 ; (acyclic? '((1 2 3 4 5 6) ((1 2) (3 4) (4 5) (5 6) (6 3))))
 
+
+
+; Left of Part 1:
+;; What changes needed for Directed Graphs? Then do Topological Sort!
+
+;;;; ANSWER: Edges represent direction by... (v1 v2) := v1->v2; Thus edges (v1 v2) =/ (v2 v1).
+
+; We were making directed graphs the entire time.
+; Detailing an undirected graph in Scheme requires the implification of a dual direction between the nodes.
+; No longer needing to check for revPair edge duplicates with eSet? and using (undirSetify E).
+; Revert away from treating edges like dual directional, but instead one way--like arrows.
+
+; tl;dr Restrict our current data structure to a more basic form. Increase restrictions.
+
+; Helper:
+(define (consEnd a list)
+  (cond ((null? list) (cons a '()))
+        (else (cons (car list) (consEnd a (cdr list))))))
+
+(define (altUnion L1 L2)
+  (cond ((null? L1) L2)
+        ((null? L2) L1)
+        (else (cons (car L1)
+                    (cons (car L2)
+                          (altUnion (cdr L1) (cdr L2)))))))
+
+; Make tree...
+
+;; connected acyclic undirected graph
+
+; Given node/root,
+; last? -> (cons (car V) '())
+; (not (vEdge? (car V) G)) -> [remVert (all) v (not in) E]
+; (oneEdge? (car V) G)) -> (cons (car V) (treeify (remEdge (getEdge (car V))) G) (getEdgeAdj v))
+; (else "Take the
+
+
+(define (treeify G v)
+  (cond (((not (acyclic? G)) #f))
+        ((not (vEdge? (car (getV G)) G)) (cons v '())) ; [remVert (all) v (not in) E]
+        ((oneEdge? (car (getV G)) G) (cons v (treeify (remVert v (remEdge (getEdge v G) G))
+                                                    (getEdgeAdj v G))))
+        (else (altUnion (treeify (remVert v (remEdge (getEdge v G) G)) (getEdgeAdj v G))
+                        (treeify (remEdge (getEdge v G) G) v)))))
+
+
+
+
+; (cons (cons (treeify (remEdge (getEdge (car VG)) G)
+;                   (treeify (re))))
+
+
+; Topological sort
+;(define (topSort G)
+;  (topSortIter G (car (getV G))))
+
+
+;;DON'T FORGET REMDISCONNECT EXISTS!
+
+
+
+
+(define (firsts E)
+  (cond ((null? E) '())
+        (else (cons (first (car E)) (firsts (cdr E))))))
+(define (seconds E)
+  (cond ((null? E) '())
+        (else (cons (second (car E)) (seconds (cdr E))))))
+
+; Find all vertices in G where no edges point to them. <- Imma call them 'heads'
+; aka iterate v, (inSet? (car V) (seconds E))
+; Returns V of heads in G.
+
+(define (findHeads G)
+  (cond ((null? (getV G)) '())
+        ((inSet? (car (getV G)) (seconds (getE G))) (findHeads (V-- G)))
+        (else (cons (car (getV G)) (findHeads (V-- G))))))
+;; ^ can easily flip to find tails!
+(define (findTails G)
+  (cond ((null? (getV G)) '())
+        ((inSet? (car (getV G)) (firsts (getE G))) (findTails (V-- G)))
+        (else (cons (car (getV G)) (findTails (V-- G))))))
+
+
+
+; already have getAllEdgeAdj
+
+; (remEdges E G) := Removes all Edges detailed in set E from graph G.
+
+(define (remEdges E G)
+  (cond ((null? E) G)
+        (else (remEdges (cdr E) (remEdge (car E) G)))))
+
+; (remVerts V G) := Removes all vertices detailed in set V from graph G.
+(define (remVerts V G)
+  (cond ((null? V) G)
+        (else (remVerts (cdr V) (remVert (car V) G)))))
+
+; (remEdgesFromV V G) := Input set of vertices V, and this removes all Edges directed away from each v (in) V.
+(define (remEdgesFromV V G)
+  (remEdges (getAssoEdges V G) G))
+
+; (getAssoEdges V G) := Input st of vertices V, and this returns a set of all edges directing away from each v (in) V. 
+(define (getAssoEdges V G)
+  (cond ((null? V) '())
+        ((inSet? (car V) (firsts (getE G))) (cons (getEdge (car V) G) (getAssoEdges V (remEdge (getEdge (car V) G) G))))
+        (else (getAssoEdges (cdr V) G))))
+
+
+
+
+; Fancy stuff
+; (forvInSUn S G funct Un)
+(define (forvInSUn S G funct Un)
+  (cond ((null? (cdr S)) (funct (car S) G))
+        (else (Un (funct (car S) G) (forvInSUn (cdr S) G funct Un)))))
+
+; (forvInSUn S G funct Un) := for all v listed in set S, perform (funct v G).
+; ^ Depending on what the function returns details the 'Un' aka 'union'.
+; ^^ In the case of topSort, I want to do a recursive call to itself for each head.
+; Thus funct == (topSort G1), where G1 = (remVerts S (remEdgesFromV S G))
+
+
+
+; Ok so we can now identify what vertices are heads and make a topography graph for each of them.
+
+; topSort := Returns V set in order of topography
+
+;; Assume Acyclic!
+;(define (topSort G)
+;  (cond ((null? (getV G)) '())
+;        (else (cons (findHeads G)
+;                    (topSort (remVerts (findHeads G) (remEdgesFromV (findHeads G) G)))))))
+
+(define (dirEdge? v G)
+  (inSet? v (firsts (getE G))))
+
+(define (noDirEdge? v G)
+  (not (inSet? v (firsts (getE G)))))
+
+
+(define (oneDirEdge? v G)
+  (and (dirEdge? v G) (noDirEdge? v (remDirEdge v G))))
+
+(define (getDirEdge v G)
+  (cond ((null? (getE G)) #f)
+        ((equal? v (first (car (getE G)))) (car (getE G)))
+        (else (getDirEdge (E-- G)))))
+
+(define (remDirEdge v G)
+  (cond ((null? (getE G)) G)
+        ((equal? v (first (car (getE G)))) (E-- G))
+        (else (E++ (car (getE G)) (remDirEdge v (E-- G))))))
+
+(define (getDirEdgeAdj v G)
+  (cond ((null? (getE G)) #f)
+        ((equal? v (first (car (getE G)))) (second (car (getE G))))
+        (else (getDirEdgeAdj v (E-- G)))))
+
+;; (topSort '((1 2 3 4 5) ((4 3) (3 2) (2 1) (5 1))))
+
+;; ^ I think I'm being too hopeful. I should probably have a function to chart every path from the head onwards.
+
+;; v is at the head. 
+(define (topSortIter v G)
+  (cond ((noDirEdge? v G) (cons v '()))
+        ((oneDirEdge? v G) (cons v (topSortIter (getDirEdgeAdj v G) G)))
+        (else (altUnion (topSortIter v (remDirEdge v G)) (topSortIter (getDirEdgeAdj v G) G)))))
+        ; ^ else, two or more path, aka branch
+
+;; Assume Acyclic!
+;(define (topSort G)
+(define (topSort G)
+  (setify (forvInSUn (findHeads G) G topSortIter altUnionCom)))
+
+(define (cdrUntilMatch v L2)
+  (cond ((null? L2) L2)
+        ((equal? (car L2) v) L2)
+        (else (cdrUntilMatch v (cdr L2)))))
+
+(define (findVCommon L1 L2)
+  (cond ((null? L1) #f)
+        ((inSet? (car L1) L2) (car L1))
+        (else (findVCommon (cdr L1) L2))))
+
+(define (commonLabelIndexDiff v L1 L2)
+  (- (getIndex v L1) (getIndex v L2)))
+
+(define (popIter n L)
+  (cond ((zero? n) '())
+        ((null? L) '())
+        (else (cons (car L) (popIter (- n 1) (cdr L))))))
+(define (remIter n L)
+  (cond ((zero? n) L)
+        (else (popIter (- n 1) (cdr L)))))
+
+
+(define (altUnionCom L1 L2)
+  (let ((v (findVCommon (cdr L1) L2)) (i (commonLabelIndexDiff (findVCommon (cdr L1) L2) L1 L2)))
+    (if (> i 0) (union (popIter i L1) (altUnion (remiter i L1) L2)) (union (popIter i L2) (altUnion (remiter i L2) L1)))))
+;  (cond ((null? L1) L2)
+;        ((equal? (car L1) (car L2)) (altUnion L1 L2))
+;        ((inSet? (car L1) L2) (altUnionCom L1 (cdrUntilMatch (car L1) L2)))
+
+
+
+(define (getIndex v S)
+  (if (atom? v)
+      (cond ((null? S) 0) ; So we get a value == cap if value not found
+            ((equal? v (car S)) 0)
+            (else (+ 1 (getIndex v (cdr S)))))
+      #f)) ;return #f if invalid v
+
+
+
+
+        
+; I feel like there's a wayyyy easier way to do topography sort. It's in the name!
+; Build from the ground up like levels.
+; Use 'union' not 'altunion' for this one!
+; ^Idea was to find tails and label them 'ground' but runs to same problem. I now know what's the issue!
+
+; Basically just keep finding heads. Then for each head, make the tree with them as a root.
+; Like rivers, they will point directions of constant decline.
+; Heads are not connected in any form, so they can't possible connect to each other!
+; However, we do not know their relative height to each other. It's a connected graph they all flow to puddles.
+; Aka tails. Thus each river must flow to a tail, or share a tail with another vertex.
+; That's why waiting for the recursion to finish helps. The last to be removed will be the most bottom tail.
+;
+
+; Ok, onePath?
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+; treeView := Vertices are sorted with '() grouping branch deviations from the main tree line/branch.
+
+;(define (treeView G)
+;  (cond ((null? (getV G)) '())
+;        ((
+
+
+
+
+
+
+
+
+; ---------------------------------------------------------------------------------------------------------------------
+
+
+;; What changes needed for Weighted Graphs? Then do Minimum Spanning Tree!
+
+;;;; ANSWER: Instead of (V E) -> G, (V E W) -> WG, where W is a lat directly correlating to repective edges' weight.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ;          ; If (vEdge? (car (getV G))) returns #f, then there's nowhere to go, and at the end of the graph with no loops found:
 ;          ((not (vEdge? v G)) (and #t (acyclic? (V-- G))))
 ;          ((oneEdge? v G) (and #t (acyclic? (V-- (remEdge (getEdge v G) G)))))
@@ -306,21 +609,8 @@
         ; And remove v's not specified in an Edge.
         (else (remDisconnect G))))
 
-;;
-(define (undirGraphify2 root G)
-  (cond ((not (vSet? (getV G))) (undirGraphify2 root (pair (setify (getV G)) (getE G))))
-        ((not (eSet? (getE G))) (undirGraphify2 root (pair (getV G) (undirSetify (getE G)))))
-        ; Now that V and E are guaranteed to be sets, remove edges with reference to a v not in V,
-        ; And remove v's not specified in an Edge.
-        (else (remDisconnect2 root G))))
-
-;; 
-
 ; (remDisconnect G) := With V and E guaranteed to be sets, remove edges with reference to a v not in V,
         ; And remove v's not specified in an Edge.
-
-(define (remDisconnect G)
-  (remVertDis (remEdgeDis (remVertDis G))))
 
 (define (remDisconnect G)
   (remVertDis (remEdgeDis (remVertDis G))))
@@ -337,14 +627,16 @@
         (else (remEdgeDis (E-- G)))))
 
 ;; Suggestions of possible computations:
-;;;; path?(v1, v2) -> BOOL
+;1;; path?(v1, v2) -> BOOL
 ;;;; shortPath(v1, v2) -> [INT or LIST DETAILING SHORTEST ROUTE aka breFirst]
-;;;; acyclic?(G) -> BOOL
-;;;; connected?(G) -> BOOL [tech EVDomain?]
+;1;; acyclic?(G) -> BOOL
+;1;; connected?(G) -> BOOL [tech EVDomain?]
 ;;;; spanningTree(G) -> TREE (requires defining TREE)
 ;;;; diameter(G) -> INT
-;;;; bipartite?(G) -> BOOL
+;1;; bipartite?(G) -> BOOL
 ;;;; largeClique(G) -> CLIQUE (requires defining CLIQUE)
+;1;; tree?(G)
+;1;; adajacent(v1, v2) <- Doesn't seem to be helpful though
 
 ;; Thus, the new data types are TREE and CLIQUE to be defined.
 
@@ -521,23 +813,9 @@
 
 ;; This returned #f <- (acyclic? '((1 2 3 4 5) ((4 1) (1 2) (2 3))))
 
-; Make helper:
-; (moreEdge? v G) := #t if more than 1 edge in G containing v; #f if only 1 or none.
-(define (moreEdge? v G)
-  (cond ((not (inSet? v (getV G))) #f) ; Not in graph, so can't have an edge
-        ((not (vEdge? v G)) #f) ; Doesn't have an edge, so #f for 0
-        ((vEdge? v (remEdge (getEdge v G) G)) #t)
-        (else #f)))
 
-; (oneEdge? v G) := #t if only 1 edge in G containing v; #f is 0 or more than 1 edge with v.
-(define (oneEdge? v G)
-  (cond ((not (inSet? v (getV G))) #f) ; Not in graph, so can't have an edge
-        ((not (vEdge? v G)) #f) ; Doesn't have an edge, so #f for 0
-        ((moreEdge? v G) #f)
-        (else #t)))
 
-(define (nextEdge v G)
-  (getEdge v (remEdge (getEdge v G) G)))
+
 
 ; (connection? G1 G2) := G1 and G2 have a connection if they have an edge connecting from a vertex from G1 to a vertex in G2.
 ; if: (exists) v s.t. v (in) G1 and v (in) G2, then #t if (and (vEdge? v G1) (vEdge? v G2))
@@ -623,3 +901,4 @@
 ;; (remEdge e G) := Removes e from G
 
 
+ 
