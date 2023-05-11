@@ -441,6 +441,16 @@
 ;        (else (cons (findHeads G)
 ;                    (topSort (remVerts (findHeads G) (remEdgesFromV (findHeads G) G)))))))
 
+
+
+; (dirEdge? v G) := #t if a dirEdge extends from v
+; (noDirEdge? v G) := #t if no dirEdge exists extending from v.
+; (oneDirEdge? v G) := #t if only one dirEdge exists extending from v.
+; (getDirEdge v G) := Returns dirEdge pair extending from v.
+; (remDirEdge v G) := Returns graph with first dirEdge pair extending from v removed.
+; (getDirEdgeAdj v G) := Returns adjacent vertex from first dirEdge pair extending from v.
+
+
 (define (dirEdge? v G)
   (inSet? v (firsts (getE G))))
 
@@ -513,6 +523,7 @@
 ;        ((inSet? (car L1) L2) (altUnionCom L1 (cdrUntilMatch (car L1) L2)))
 
 
+; (getIndex v S) := given index v, return element in specified index of S.
 
 (define (getIndex v S)
   (if (atom? v)
@@ -521,6 +532,11 @@
             (else (+ 1 (getIndex v (cdr S)))))
       #f)) ;return #f if invalid v
 
+; (remIndex i S) := Removes element at index i in S.
+(define (remIndex i S)
+  (cond ((null? S) S)
+        ((zero? i) (cdr S))
+        (else (cons (car S) (remIndex (- i 1) (cdr S))))))
 
 
 
@@ -603,11 +619,14 @@
 ; (remIter n L) := Removes n elements from beginning of lat L.
 ; (altUnionCom L1 L2) := This performs an alternating union around the first common vertex in both L1 and L2. This preserves topography.
 ; (getIndex v S) := Returns index value of v in S for reference later.
+; (remIndex i S) := Removes element at index i in S.
 
-
-
-
-; (
+; (dirEdge? v G) := #t if a dirEdge extends from v
+; (noDirEdge? v G) := #t if no dirEdge exists extending from v.
+; (oneDirEdge? v G) := #t if only one dirEdge exists extending from v.
+; (getDirEdge v G) := Returns dirEdge pair extending from v.
+; (remDirEdge v G) := Returns graph with first dirEdge pair extending from v removed.
+; (getDirEdgeAdj v G) := Returns adjacent vertex from first dirEdge pair extending from v.
 
 ; ---------------------------------------------------------------------------------------------------------------------
 
@@ -638,11 +657,39 @@
         (else (weMatch? (E-- (W-- G))))))
 
 ; (getAssoWeight v G) := For vertex v, get the weight of the first dirEdge directing away from v.
+
+(define (getAssoWeight v G)
+  (getIndex (e->l2 (getDirEdge v G) G) (getW G)))
+
+; (remAssoWeight v G) := Removes both the first dirEdge and its associated weight of vertex v in graph G.
+; pre: (dirEdge? v G) -> #t.
+(define (remAssoWeight v G)
+  (remEdge (getDirEdge v G) (triple (getV G) (getE G) (remIndex (e->l2 (getDirEdge v G) G) (getW G)))))
+
+; (getAllAssoWeights v G) := Returns a list of all the edgeWeights of dirEdges away from v.
+(define (getAllAssoWeights v G)
+  (cond ((noDirEdge? v G) '())
+        (else (cons (getAssoWeight v G) (remDirEdge v G)))))
+
+; returns the dirEdge with the lowest associated weight away from v.
+(define (getLowestAssoWeight v G)
+  (cond (noDirEdge?)))
+
+
+
 ; (getLowestAssoWeight := For vertex v, get the weight of the dirEdge directing away from v with the lowest weight. [MUST BE NONNEGATIVE]
 
 
+; Want to implement Minimum-Spanning Tree for Weighted Graphs.
+; My idea: Look at every node and delete all but the lowest weights to each node.
+; Thus: Take the topologic sort of the Graph and the first node should be the head of the tree.
+; Then find the shortest path between the head and every vertex in V of G.
+; Compile the tree of all shortest paths and that's the MST.
 
-
+; pre: WG is acyclic
+(define (MST WG)
+  (let ((acyclicWG (acyclify WG))
+        (let ((root (car (topSort acyclicWG))))
 
 
 
