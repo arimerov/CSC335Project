@@ -37,9 +37,6 @@
         (else (remEdgeDis (E-- G)))))
 
 
-; Checks if G is a directed graph
-(define (dirGraph? G)
-  (and (VSet? (getV G)) (ESet? (getE G)) (EVDomain? (getE G) (getV G))))
 
 (define (vEdge? v G)
   (cond ((null? (getE G)) #f)
@@ -110,31 +107,8 @@
 (define (getAllEdgeAdj v G)
   (cond ((vEdge? v G) (cons (getEdgeAdj v G) (getAllEdgeAdj v (remEdge (getEdge v G) G))))
         (else '())))
-(define (getAllDirEdgeAdj v G)
-  (cond ((dirEdge? v G) (cons (getDirEdgeAdj v G) (getAllDirEdgeAdj v (remEdge (getEdge v G) G))))
-        (else '())))
 
-; Directed Graphs
-(define (findHeads G)
-  (cond ((null? (getV G)) '())
-        ((inSet? (car (getV G)) (seconds (getE G))) (findHeads (V-- G)))
-        (else (cons (car (getV G)) (findHeads (V-- G))))))
-;; ^ can easily flip to find tails!
-(define (findTails G)
-  (cond ((null? (getV G)) '())
-        ((inSet? (car (getV G)) (firsts (getE G))) (findTails (V-- G)))
-        (else (cons (car (getV G)) (findTails (V-- G))))))
 
-; Fancy stuff
-; (forvInSUn S G funct Un)
-(define (forvInSUn S G funct Un)
-  (cond ((null? (cdr S)) (funct (car S) G))
-        (else (Un (funct (car S) G) (forvInSUn (cdr S) G funct Un)))))
-
-; (forvInSUn S G funct Un) := for all v listed in set S, perform (funct v G).
-; ^ Depending on what the function returns details the 'Un' aka 'union'.
-; ^^ In the case of topSort, I want to do a recursive call to itself for each head.
-; Thus funct == (topSort G1), where G1 = (remVerts S (remEdgesFromV S G))
 
 (define (V-- G)
   (pair (cdr (getV G)) (getE G)))
@@ -148,12 +122,12 @@
 (define (E++ e G)
   (pair (getV G) (cons e (getE G))))
 
-
+;; (vShare? G1 G2) := #t if G1 and G2 share a vertex.
 (define (vShare? G1 G2)
   (cond ((null? (getV G1)) #f)
         ((inSet? (car (getV G1)) (getV G2)) #t)
         (else (or #f (vShare? (V-- G1) G2)))))
-
+;; (getVShare G1 G2) := Returns first v in G1 and G2 that is shared.
 (define (getVShare G1 G2)
   (cond ((null? (getV G1)) #f)
         ((inSet? (car (getV G1)) (getV G2)) (car (getV G1)))
