@@ -1,0 +1,6 @@
+(define (connected? G)
+  (define (connected?iter G l1)
+    (cond ((>= l1 (first (undir->labeled G))) #t)
+          ((null? (getV G)) #t)
+          (else (and (path? (car (getV G)) (l1->v l1 G) G) (connected?iter G (+ 1 l1))))))
+  (connected?iter G 1))
